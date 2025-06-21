@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>T5 Paraphrasing Tool</title>
+    <!-- The script tag is no longer needed here as it will be imported dynamically in the module script -->
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --secondary: #f9fafb;
+            --dark: #1f2937;
+            --light: #f3f4f6;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, var(--primary), #7c3aed);
+            color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            padding: 25px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-content {
+            flex-grow: 1;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--light);
+        }
+        
+        .card-title {
+            font-size: 1.4rem;
+            color: var(--primary);
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 300px;
+            height: 100%;
+            padding: 15px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 1rem;
+            resize: vertical;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+        }
+        
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #4338ca;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .btn-secondary {
+            background-color: var(--secondary);
+            color: var(--dark);
+            border: 1px solid #d1d5db;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #f3f4f6;
+        }
+        
+        .btn-success {
+            background-color: var(--success);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background-color: #059669;
+        }
+        
+        .btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .result-content {
+            background-color: var(--light);
+            padding: 15px;
+            border-radius: 8px;
+            min-height: 300px;
+            height: 100%;
+            white-space: pre-wrap;
+            line-height: 1.8;
+            word-wrap: break-word;
+        }
+        
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            text-align: center;
+            min-height: 300px;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(79, 70, 229, 0.2);
+            border-top: 5px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .progress-bar {
+            width: 100%;
+            max-width: 250px;
+            height: 8px;
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+        
+        .progress {
+            height: 100%;
+            background-color: var(--primary);
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+        
+        .status {
+            margin-top: 15px;
+            font-weight: 500;
+            color: var(--primary);
+        }
+        
+        .counter {
+            display: inline-block;
+            background-color: var(--primary);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            min-width: 40px;
+            text-align: center;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transform: translateX(120%);
+            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification-success {
+            border-left: 4px solid var(--success);
+        }
+        
+        .notification-error {
+            border-left: 4px solid var(--danger);
+        }
+        
+        .notification-icon {
+            font-size: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI Paraphrasing Tool</h1>
+            <p class="subtitle">Transform text while preserving meaning using advanced AI</p>
+        </header>
+        
+        <div class="main-content">
+            <div class="card">
+                <div class="card-content">
+                    <div class="card-header">
+                        <h2 class="card-title">Input Text</h2>
+                    </div>
+                    <textarea id="inputText" placeholder="Enter or paste your text here...">How to Get a Data Science Job With No Experience
+
+Getting a job in data science without experience might seem impossible, but it’s not. You just need to know the right approach. In this guide, we’ll cover the exact steps you should take to land your first data science job.
+
+Step 1: Learn the Fundamentals
+Start with mastering Python or R programming, then move to statistics and mathematics. Finally, learn machine learning concepts and practice on real datasets.
+
+Step 2: Build a Portfolio
+Create 3-5 high-quality projects demonstrating your skills. Include clean code, proper documentation, and a clear explanation of your methodology.
+
+Step 3: Network Effectively
+Attend meetups, connect with professionals on LinkedIn, and contribute to open-source projects. Personal connections often lead to job opportunities.</textarea>
+                </div>
+                <div class="controls">
+                    <button id="paraphraseBtn" class="btn btn-primary">
+                        <span>Paraphrase Text</span>
+                    </button>
+                    <button id="clearBtn" class="btn btn-secondary">Clear</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-content">
+                    <div class="card-header">
+                        <h2 class="card-title">Output Result</h2>
+                        <span id="counter" class="counter">0%</span>
+                    </div>
+                    
+                    <div id="loading" class="loading">
+                        <div class="spinner"></div>
+                        <p>Initializing AI model. This may take a moment...</p>
+                        <div class="progress-bar">
+                            <div id="progress" class="progress"></div>
+                        </div>
+                        <p id="status" class="status">Loading model: 0%</p>
+                    </div>
+                    
+                    <div id="outputContent" class="result-content" style="display: none;">
+                        <p>Your paraphrased text will appear here.</p>
+                        <p>Enter text on the left and click "Paraphrase Text" to begin.</p>
+                    </div>
+                </div>
+                
+                <div class="controls">
+                    <button id="copyBtn" class="btn btn-secondary" disabled>
+                        Copy to Clipboard
+                    </button>
+                    <button id="downloadBtn" class="btn btn-success" disabled>
+                        Download Results
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Powered by Transformers.js | Model: Xenova/t5-small</p>
+        </div>
+    </div>
+    
+    <div id="notification" class="notification">
+        <span class="notification-icon">✓</span>
+        <div class="notification-content">Operation completed successfully!</div>
+    </div>
+
+    <!-- The script is now a module to support modern import syntax -->
+    <script type="module">
+        // DOM Elements
+        const inputText = document.getElementById('inputText');
+        const paraphraseBtn = document.getElementById('paraphraseBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const outputContent = document.getElementById('outputContent');
+        const loadingElement = document.getElementById('loading');
+        const progressBar = document.getElementById('progress');
+        const statusText = document.getElementById('status');
+        const counter = document.getElementById('counter');
+        const notification = document.getElementById('notification');
+        
+        // Application state
+        let pipeline = null;
+        let originalText = '';
+        let paraphrasedText = '';
+        
+        // Initialize Transformers.js pipeline using dynamic import
+        async function initializeModel() {
+            try {
+                // Dynamically import the pipeline function from the CDN.
+                const { pipeline: p } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1');
+                
+                const progressCallback = (progress) => {
+                    const percent = Math.round(progress.progress);
+                    counter.textContent = `${percent}%`;
+                    progressBar.style.width = `${percent}%`;
+                    statusText.textContent = `${progress.status}: ${percent}%`;
+                };
+                
+                // Changed model to t5-small, which is a more standard and accessible model.
+                // This should resolve the "Unauthorized access" error.
+                pipeline = await p(
+                    'text2text-generation', 
+                    'Xenova/t5-small', 
+                    { 
+                        progress_callback: progressCallback,
+                        quantized: true 
+                    }
+                );
+                
+                loadingElement.style.display = 'none';
+                outputContent.style.display = 'block';
+                showNotification('Model loaded successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Error initializing model:', error);
+                loadingElement.style.display = 'block'; // Keep loading visible
+                const errorMsg = `Failed to load AI model. This can be due to a network issue. Please check your connection and try refreshing the page.`;
+                loadingElement.innerHTML = `<p style="color: var(--danger); padding: 20px;">${errorMsg}</p>`;
+                showNotification('Failed to load model', 'error');
+            }
+        }
+        
+        // Initialize model when the page loads
+        window.addEventListener('load', initializeModel);
+        
+        // Splits text into paragraphs
+        function getParagraphs(text) {
+            return text.split(/\n+/g).filter(p => p.trim().length > 0);
+        }
+        
+        // Paraphrases a single chunk of text
+        async function paraphraseChunk(textChunk) {
+            if (!textChunk.trim() || textChunk.trim().length < 15) {
+                return textChunk;
+            }
+            
+            // This prompt is suitable for general text2text models like t5-small
+            const input = `paraphrase: ${textChunk}`;
+            
+            try {
+                const output = await pipeline(input, {
+                    max_length: 512,
+                    do_sample: true,
+                    top_k: 120,
+                    top_p: 0.95,
+                    num_return_sequences: 1,
+                });
+                
+                return output[0].generated_text;
+            } catch (error) {
+                console.error(`Error paraphrasing chunk: "${textChunk}"`, error);
+                showNotification(`An error occurred while processing a paragraph.`, 'error');
+                return textChunk; // Return original chunk on error
+            }
+        }
+        
+        // Main paraphrasing logic
+        async function paraphraseText() {
+            if (!pipeline) {
+                showNotification('Model is not ready. Please wait.', 'error');
+                return;
+            }
+            
+            const text = inputText.value.trim();
+            if (!text) {
+                showNotification('Please enter some text to paraphrase', 'error');
+                return;
+            }
+            
+            try {
+                // --- UI SETUP ---
+                paraphraseBtn.disabled = true;
+                clearBtn.disabled = true;
+                downloadBtn.disabled = true;
+                copyBtn.disabled = true;
+                outputContent.style.display = 'none';
+                loadingElement.style.display = 'flex';
+                counter.textContent = '0%';
+                progressBar.style.width = '0%';
+                statusText.textContent = 'Processing...';
+                
+                originalText = text;
+                
+                // --- PROCESSING ---
+                const paragraphs = getParagraphs(text);
+                const totalParagraphs = paragraphs.length;
+                let paraphrasedParagraphs = [];
+                
+                for (let i = 0; i < totalParagraphs; i++) {
+                    const paragraph = paragraphs[i];
+                    
+                    const progress = Math.round(((i + 1) / totalParagraphs) * 100);
+                    statusText.textContent = `Processing paragraph ${i + 1} of ${totalParagraphs}`;
+
+                    const result = await paraphraseChunk(paragraph);
+                    paraphrasedParagraphs.push(result);
+                    
+                    // Update progress UI
+                    counter.textContent = `${progress}%`;
+                    progressBar.style.width = `${progress}%`;
+                }
+                
+                paraphrasedText = paraphrasedParagraphs.join('\n\n');
+                
+                // --- UI CLEANUP ---
+                outputContent.innerHTML = paraphrasedText.replace(/\n/g, '<br>');
+                loadingElement.style.display = 'none';
+                outputContent.style.display = 'block';
+                
+                downloadBtn.disabled = false;
+                copyBtn.disabled = false;
+                paraphraseBtn.disabled = false;
+                clearBtn.disabled = false;
+                
+                showNotification('Text paraphrased successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Error during paraphrasing:', error);
+                outputContent.innerHTML = `<p style="color: var(--danger);">An unexpected error occurred: ${error.message}</p>`;
+                loadingElement.style.display = 'none';
+                outputContent.style.display = 'block';
+                paraphraseBtn.disabled = false;
+                clearBtn.disabled = false;
+                showNotification('Error during paraphrasing', 'error');
+            }
+        }
+        
+        // --- EVENT LISTENERS ---
+        paraphraseBtn.addEventListener('click', paraphraseText);
+        
+        clearBtn.addEventListener('click', () => {
+            inputText.value = '';
+            outputContent.innerHTML = '<p>Your paraphrased text will appear here.</p>';
+            downloadBtn.disabled = true;
+            copyBtn.disabled = true;
+            originalText = '';
+            paraphrasedText = '';
+        });
+        
+        downloadBtn.addEventListener('click', () => {
+            const blob = new Blob([
+                "--- ORIGINAL TEXT ---\n",
+                originalText,
+                "\n\n--- PARAPHRASED TEXT ---\n",
+                paraphrasedText
+            ], { type: 'text/plain;charset=utf-8' });
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'paraphrased_output.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showNotification('File downloaded!', 'success');
+        });
+        
+        function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showNotification('Text copied to clipboard!', 'success');
+                }).catch(err => {
+                    copyFallback(text);
+                });
+            } else {
+                copyFallback(text);
+            }
+        }
+        
+        function copyFallback(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            textArea.style.top = '0';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                if (document.execCommand('copy')) {
+                    showNotification('Text copied to clipboard!', 'success');
+                } else {
+                    showNotification('Failed to copy text.', 'error');
+                }
+            } catch (err) {
+                showNotification('Failed to copy text.', 'error');
+            }
+            document.body.removeChild(textArea);
+        }
+
+        copyBtn.addEventListener('click', () => {
+             if (paraphrasedText) {
+                copyToClipboard(paraphrasedText);
+            }
+        });
+        
+        function showNotification(message, type = 'success') {
+            const icon = type === 'success' ? '✓' : '!';
+            notification.className = `notification ${type === 'success' ? 'notification-success' : 'notification-error'}`;
+            notification.querySelector('.notification-icon').textContent = icon;
+            notification.querySelector('.notification-content').textContent = message;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
