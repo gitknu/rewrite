@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline Paraphrasing Tool</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Import transformers.js library -->
+    <script type="module">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1';
+        window.pipeline = pipeline;
+        window.env = env;
+    </script>
+    <style>
+        /* Custom font and basic body styling */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Prevent scrollbars from flickering during layout shift */
+        }
+        /* Custom styling for the textareas to make them look clean and modern */
+        textarea {
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #3b82f6; /* blue-500 */
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex flex-col h-screen">
+
+    <header class="bg-white shadow-md p-4 z-10">
+        <h1 class="text-2xl font-bold text-center text-gray-700">Self-Hosted Paraphrasing Tool</h1>
+        <p class="text-center text-sm text-gray-500 mt-1">Powered by Transformers.js | Runs entirely in your browser</p>
+    </header>
+
+    <main class="flex-grow flex flex-col md:flex-row gap-4 p-4 overflow-auto">
+        <!-- Input Text Area -->
+        <div class="flex-1 flex flex-col bg-white p-4 rounded-lg shadow-md">
+            <label for="input-text" class="text-lg font-semibold text-gray-600 mb-2">Original Text</label>
+            <textarea id="input-text" class="flex-grow w-full p-3 border border-gray-300 rounded-md resize-none bg-gray-50" placeholder="Enter the text you want to paraphrase here..."></textarea>
+        </div>
+
+        <!-- Output Text Area -->
+        <div class="flex-1 flex flex-col bg-white p-4 rounded-lg shadow-md">
+            <label for="output-text" class="text-lg font-semibold text-gray-600 mb-2">Paraphrased Text</label>
+            <textarea id="output-text" class="flex-grow w-full p-3 border border-gray-300 rounded-md resize-none bg-gray-50" placeholder="The paraphrased result will appear here..." readonly></textarea>
+        </div>
+    </main>
+
+    <footer class="p-4 bg-white shadow-inner flex flex-col sm:flex-row items-center justify-center gap-4 z-10">
+        <button id="paraphrase-btn" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300">
+            Paraphrase Text
+        </button>
+        <div id="status" class="text-center text-gray-600 font-medium h-6"></div>
+    </footer>
+
+
+    <script type="module">
+        // Get references to the UI elements
+        const inputTextElem = document.getElementById('input-text');
+        const outputTextElem = document.getElementById('output-text');
+        const paraphraseBtn = document.getElementById('paraphrase-btn');
+        const statusElem = document.getElementById('status');
+        
+        // Example text to get the user started
+        inputTextElem.value = `Getting a job in data science without experience might seem impossible, but it’s not. You just need to know the right approach. In this guide, we’ll cover the exact steps you should take to land your first data science job. Start with mastering Python or R programming, then move to statistics and mathematics. Finally, learn machine learning concepts and practice on real datasets.`;
+
+
+        // Use a singleton pattern to ensure the model pipeline is initialized only once.
+        class ParaphrasingPipeline {
+            static task = 'text2text-generation';
+            // ** MODEL CHANGE TO FIX ACCESS ERROR **
+            // The "Unauthorized access" error suggests a network policy issue.
+            // Switching to another model (`Xenova/LaMini-T5-738M`) to see if its files are accessible.
+            static model = 'Xenova/LaMini-T5-738M';
+            static instance = null;
+
+            static async getInstance(progress_callback = null) {
+                if (this.instance === null) {
+                    // `env.allowLocalModels = false` prevents the browser from trying to access local file system.
+                    window.env.allowLocalModels = false;
+                    
+                    // The `pipeline` function will download and cache the model.
+                    // The `progress_callback` will be called with progress updates.
+                    this.instance = await window.pipeline(this.task, this.model, { progress_callback });
+                }
+                return this.instance;
+            }
+        }
+        
+        // Listen for clicks on the paraphrase button
+        paraphraseBtn.addEventListener('click', async () => {
+            // Get the input text and check if it's empty
+            const inputText = inputTextElem.value.trim();
+            if (!inputText) {
+                // Using a custom modal/alert in the future would be better, but alert is fine for now.
+                alert('Please enter some text to paraphrase.');
+                return;
+            }
+
+            // Disable the button and clear previous output to prevent multiple clicks
+            paraphraseBtn.disabled = true;
+            paraphraseBtn.textContent = 'Processing...';
+            outputTextElem.value = '';
+
+            try {
+                // 1. Initialize the model pipeline
+                // The progress callback updates the status element on the UI.
+                statusElem.textContent = 'Initializing model... (This may take a moment on first run)';
+                const generator = await ParaphrasingPipeline.getInstance((progress) => {
+                    statusElem.textContent = `${progress.status}... (${Math.round(progress.progress)}%)`;
+                });
+                statusElem.textContent = 'Model loaded successfully!';
+
+                // 2. Tokenize text into sentences
+                // A simple regex to split sentences. It handles periods, question marks, and exclamation marks.
+                const sentences = inputText.match(/[^.!?]+[.!?]+/g) || [inputText];
+                const paraphrasedSentences = [];
+
+                // 3. Paraphrase each sentence
+                for (let i = 0; i < sentences.length; i++) {
+                    const sentence = sentences[i].trim();
+                    // Skip very short or empty strings
+                    if (sentence.length < 10) {
+                        paraphrasedSentences.push(sentence);
+                        continue;
+                    }
+
+                    statusElem.textContent = `Paraphrasing sentence ${i + 1} of ${sentences.length}...`;
+                    
+                    // This prompt format works well for instruction-tuned models.
+                    const prompt = `paraphrase: ${sentence}`;
+                    
+                    // Generate the paraphrased output
+                    const output = await generator(prompt, {
+                        max_length: 512, // Set max length for the output
+                        num_beams: 5,     // Use beam search for higher quality results
+                        no_repeat_ngram_size: 2,
+                        early_stopping: true,
+                    });
+
+                    paraphrasedSentences.push(output[0].generated_text);
+                    
+                    // Update the output in real-time
+                    outputTextElem.value = paraphrasedSentences.join(' ');
+                }
+
+                // 4. Finalize the output
+                outputTextElem.value = paraphrasedSentences.join(' ');
+                statusElem.textContent = 'Paraphrasing complete!';
+
+            } catch (error) {
+                console.error('An error occurred during paraphrasing:', error);
+                statusElem.textContent = 'An error occurred. Please check the console.';
+            } finally {
+                // Re-enable the button once processing is complete or an error occurs
+                paraphraseBtn.disabled = false;
+                paraphraseBtn.textContent = 'Paraphrase Text';
+            }
+        });
+    </script>
+
+</body>
+</html>
