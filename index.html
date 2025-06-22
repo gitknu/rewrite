@@ -1,0 +1,226 @@
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Перефразування текстів локально</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1';
+        window.pipeline = pipeline;
+        window.env = env;
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; 
+        }
+        textarea {
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #3b82f6; 
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+        }
+        .progress-bar {
+            height: 4px;
+            background: #d1d5db;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #3b82f6;
+            transition: width 0.3s ease;
+        }
+        .symbol-counter {
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-align: right;
+            margin-top: 0.5rem;
+            transition: all 0.3s ease;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            background: linear-gradient(90deg, #10B981 0%, #10B981 100%);
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            background-position: left center;
+            display: inline-block;
+        }
+        .calming-animation {
+            position: relative;
+            overflow: hidden;
+        }
+        .calming-animation::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(
+                to right,
+                transparent 0%,
+                rgba(59, 130, 246, 0.05) 50%,
+                transparent 100%
+            );
+            animation: shimmer 2s infinite;
+            z-index: 1;
+        }
+        @keyframes shimmer {
+            100% {
+                left: 150%;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex flex-col h-screen">
+    <header class="bg-white shadow-md p-4 z-10">
+        <h1 class="text-2xl font-bold text-center text-gray-700">Перефразування текстів локально</h1>
+        <p class="text-center text-sm text-gray-500 mt-1">На основі Transformers.js | Працює повністю в браузері</p>
+    </header>
+    <main class="flex-grow flex flex-col md:flex-row gap-4 p-4 overflow-auto">
+        <div class="flex-1 flex flex-col bg-white p-4 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-2">
+                <label for="input-text" class="text-lg font-semibold text-gray-600">Оригінальний текст</label>
+                <div id="symbol-counter" class="symbol-counter">Необхідно ввести свій текст - 0</div>
+            </div>
+            <textarea id="input-text" class="flex-grow w-full p-3 border border-gray-300 rounded-md resize-none bg-gray-50" placeholder="Сюди необхідно вводити текст для перефразування..."></textarea>
+        </div>
+        <div class="flex-1 flex flex-col bg-white p-4 rounded-lg shadow-md">
+            <label for="output-text" class="text-lg font-semibold text-gray-600 mb-2">Перефразований текст</label>
+            <textarea id="output-text" class="flex-grow w-full p-3 border border-gray-300 rounded-md resize-none bg-gray-50" placeholder="Результат перефразування з'явиться тут..." readonly></textarea>
+        </div>
+    </main>
+    <footer class="p-4 bg-white shadow-inner flex flex-col sm:flex-row items-center justify-center gap-4 z-10">
+        <div class="flex flex-col w-full max-w-md items-center">
+            <div id="loading-status" class="text-center text-gray-600 font-medium mb-2 min-h-[24px]">
+                Завантаження моделі... Будь ласка, зачекайте.
+            </div>
+            <div class="progress-bar w-full mb-4">
+                <div id="progress-fill" class="progress-fill w-0"></div>
+            </div>
+        </div>
+        <button id="paraphrase-btn" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100" disabled>
+            Перефразувати текст
+        </button>
+        <div id="status" class="text-center text-gray-600 font-medium h-6"></div>
+    </footer>
+    <script type="module">
+        const inputTextElem = document.getElementById('input-text');
+        const outputTextElem = document.getElementById('output-text');
+        const paraphraseBtn = document.getElementById('paraphrase-btn');
+        const statusElem = document.getElementById('status');
+        const loadingStatusElem = document.getElementById('loading-status');
+        const progressFillElem = document.getElementById('progress-fill');
+        const symbolCounterElem = document.getElementById('symbol-counter');
+        inputTextElem.value = `Getting a job in data science without experience might seem impossible, but it’s not. You just need to know the right approach. In this guide, we’ll cover the exact steps you should take to land your first data science job. Start with mastering Python or R programming, then move to statistics and mathematics. Finally, learn machine learning concepts, practice on real datasets. Soon this will help!`;
+        function updateSymbolCounter() {
+            const length = inputTextElem.value.length;
+            let alertText;
+            if (length === 0) {
+                alertText = "Необхідно ввести свій текст";
+            } else if (length <= 200) {
+                alertText = "Легкий до опрацювання";
+            } else if (length <= 300) {
+                alertText = "Може зайняти певний час";
+            } else if (length <= 400) {
+                alertText = "Граничний час опрацювання";
+            } else {
+                alertText = "Високий ризик зависання";
+            }
+            symbolCounterElem.textContent = `${alertText} - ${length}`;
+            if (length <= 200) {
+                symbolCounterElem.style.background = "linear-gradient(90deg, #10B981 0%, #10B981 100%)";
+            } else if (length <= 300) {
+                const percent = Math.min(100, (length - 200) / 100 * 100);
+                symbolCounterElem.style.background = `linear-gradient(90deg, #10B981 0%, #FBBF24 ${percent}%)`;
+            } else if (length <= 400) {
+                const percent = Math.min(100, (length - 300) / 100 * 100);
+                symbolCounterElem.style.background = `linear-gradient(90deg, #FBBF24 0%, #F97316 ${percent}%)`;
+            } else {
+                const percent = Math.min(100, (length - 400) / 50 * 100);
+                symbolCounterElem.style.background = `linear-gradient(90deg, #F97316 0%, #EF4444 ${percent}%)`;
+            }
+        }
+        updateSymbolCounter();
+        inputTextElem.addEventListener('input', updateSymbolCounter);
+        class ParaphrasingPipeline {
+            static task = 'text2text-generation';
+            static model = 'Xenova/LaMini-T5-738M';
+            static instance = null;
+            static async getInstance(progress_callback = null) {
+                if (this.instance === null) {
+                    window.env.allowLocalModels = false;
+                    this.instance = await window.pipeline(this.task, this.model, { progress_callback });
+                }
+                return this.instance;
+            }
+        }
+        async function loadModel() {
+            try {
+                const updateProgress = (progress) => {
+                    const percentage = Math.round(progress.progress);
+                    progressFillElem.style.width = `${percentage}%`;
+                    loadingStatusElem.textContent = `${progress.status}... (${percentage}%)`;
+                    if (progress.status === "ready") {
+                        loadingStatusElem.textContent = "Модель успішно завантажена!";
+                        paraphraseBtn.disabled = false;
+                        statusElem.textContent = "Готово до перефразування";
+                        progressFillElem.style.background = "#10b981"; 
+                    }
+                };
+                await ParaphrasingPipeline.getInstance(updateProgress);
+            } catch (error) {
+                console.error('Помилка завантаження моделі:', error);
+                loadingStatusElem.textContent = `Помилка завантаження: ${error.message}`;
+                loadingStatusElem.classList.add('text-red-600');
+            }
+        }
+        document.addEventListener('DOMContentLoaded', loadModel);
+        paraphraseBtn.addEventListener('click', async () => {
+            const inputText = inputTextElem.value.trim();
+            if (!inputText) {
+                statusElem.textContent = 'Будь ласка, введіть текст для перефразування.';
+                return;
+            }
+            paraphraseBtn.disabled = true;
+            paraphraseBtn.textContent = 'Обробка...';
+            outputTextElem.value = '';
+            outputTextElem.classList.add('calming-animation');
+            try {
+                const generator = await ParaphrasingPipeline.getInstance();
+                const sentences = inputText.match(/[^.!?]+[.!?]+/g) || [inputText];
+                const paraphrasedSentences = [];
+                for (let i = 0; i < sentences.length; i++) {
+                    const sentence = sentences[i].trim();
+                    if (sentence.length < 10) {
+                        paraphrasedSentences.push(sentence);
+                        continue;
+                    }
+                    statusElem.textContent = `Перефразування речення ${i + 1} з ${sentences.length}...`;
+                    const prompt = `paraphrase: ${sentence}`;
+                    const output = await generator(prompt, {
+                        max_length: 512, 
+                        num_beams: 5,    
+                        no_repeat_ngram_size: 2,
+                        early_stopping: true,
+                    });
+                    paraphrasedSentences.push(output[0].generated_text);
+                    outputTextElem.value = paraphrasedSentences.join(' ');
+                }
+                outputTextElem.value = paraphrasedSentences.join(' ');
+                statusElem.textContent = 'Перефразування завершено!';
+            } catch (error) {
+                console.error('Помилка під час перефразування:', error);
+                statusElem.textContent = 'Сталася помилка. Будь ласка, перевірте консоль.';
+            } finally {
+                outputTextElem.classList.remove('calming-animation');
+                paraphraseBtn.disabled = false;
+                paraphraseBtn.textContent = 'Перефразувати Текст';
+            }
+        });
+    </script>
+</body>
+</html>
