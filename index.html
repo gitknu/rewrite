@@ -48,31 +48,6 @@
             background-position: left center;
             display: inline-block;
         }
-        .calming-animation {
-            position: relative;
-            overflow: hidden;
-        }
-        .calming-animation::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 50%;
-            height: 100%;
-            background: linear-gradient(
-                to right,
-                transparent 0%,
-                rgba(59, 130, 246, 0.05) 50%,
-                transparent 100%
-            );
-            animation: shimmer 2s infinite;
-            z-index: 1;
-        }
-        @keyframes shimmer {
-            100% {
-                left: 150%;
-            }
-        }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800 flex flex-col h-screen">
@@ -166,6 +141,7 @@
                     loadingStatusElem.textContent = `${progress.status}... (${percentage}%)`;
                     if (progress.status === "ready") {
                         loadingStatusElem.textContent = "Модель успішно завантажена!";
+                        // Enable button when model is ready
                         paraphraseBtn.disabled = false;
                         statusElem.textContent = "Готово до перефразування";
                         progressFillElem.style.background = "#10b981"; 
@@ -188,7 +164,6 @@
             paraphraseBtn.disabled = true;
             paraphraseBtn.textContent = 'Обробка...';
             outputTextElem.value = '';
-            outputTextElem.classList.add('calming-animation');
             try {
                 const generator = await ParaphrasingPipeline.getInstance();
                 const sentences = inputText.match(/[^.!?]+[.!?]+/g) || [inputText];
@@ -216,7 +191,6 @@
                 console.error('Помилка під час перефразування:', error);
                 statusElem.textContent = 'Сталася помилка. Будь ласка, перевірте консоль.';
             } finally {
-                outputTextElem.classList.remove('calming-animation');
                 paraphraseBtn.disabled = false;
                 paraphraseBtn.textContent = 'Перефразувати Текст';
             }
